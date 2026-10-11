@@ -1,0 +1,43 @@
+---
+# cPanel "Git Version Control" deployment manifest — MAWO SCHOOLS instance.
+# $HOME resolves to the account home (e.g. /home1/rgabfmmy), so paths are portable.
+#
+# Same-origin layout (no separate api subdomain, no CORS):
+#   • App  → portal.mawoschools.ng            Document Root: <HOME>/mawoschools-portal
+#   • API  → portal.mawoschools.ng/api/...     served via a symlink to the backend below.
+#
+# IMPORTANT: files are ONLY copied when you click "Deploy HEAD Commit" in
+#   cPanel → Git Version Control → Manage → Pull or Deploy.
+#
+# ONE-TIME SERVER SETUP:
+#   1. Subdomain portal.mawoschools.ng → Document Root: <HOME>/mawoschools-portal
+#   2. MultiPHP Manager → set portal.mawoschools.ng to PHP 8.x (it runs the API via /api)
+#   3. After the first deploy, create <HOME>/mawoschools-api/config/database.php and
+#      <HOME>/mawoschools-api/config/ai.php with real values (git-ignored; the deploy
+#      ships only the .example files and never overwrites your real config).
+deployment:
+  tasks:
+    # ── Backend (PHP API) → kept OUTSIDE the web root at <HOME>/mawoschools-api ──
+    - /bin/echo "== Deploying MAWO SCHOOLS API to $HOME/mawoschools-api (outside docroot) =="
+    - /bin/mkdir -p "$HOME/mawoschools-api/app"
+    - /bin/mkdir -p "$HOME/mawoschools-api/database"
+    - /bin/mkdir -p "$HOME/mawoschools-api/public"
+    - /bin/mkdir -p "$HOME/mawoschools-api/config"
+    - /bin/cp -R  backend/app/.      "$HOME/mawoschools-api/app/"
+    - /bin/cp -R  backend/database/. "$HOME/mawoschools-api/database/"
+    - /bin/cp -R  backend/public/.   "$HOME/mawoschools-api/public/"
+    # -n = no-clobber: ships database.php.example / ai.php.example without
+    # overwriting your real config on redeploys.
+    - /bin/cp -Rn backend/config/.   "$HOME/mawoschools-api/config/"
+
+    # ── Frontend (React build) → portal.mawoschools.ng docroot ──
+    - /bin/echo "== Deploying frontend (SPA) to $HOME/mawoschools-portal =="
+    - /bin/mkdir -p "$HOME/mawoschools-portal"
+    - /bin/cp -R  learnersforge/dist/. "$HOME/mawoschools-portal/"
+
+    # ── Expose the API on the SAME origin at /api → portal.mawoschools.ng/api/v1/... ──
+    # ln -sfn is idempotent (safe to re-run every deploy). PHP resolves the real
+    # path, so app/ and config/ stay outside the web root.
+    - /bin/ln -sfn "$HOME/mawoschools-api/public" "$HOME/mawoschools-portal/api"
+    - /bin/echo "== Docroot now contains: =="
+    - /bin/ls -la "$HOME/mawoschools-portal"
